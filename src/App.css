@@ -51,15 +51,15 @@
 /* ── Page wrapper ── */
 .page {
   width: 100%;
-  max-width: 960px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 1.25rem 1rem;
+  padding: 1.25rem 1.5rem;
   min-height: calc(100vh - 56px);
 }
 
 @media (min-width: 640px) {
   .page {
-    padding: 2rem 1.5rem;
+    padding: 1.5rem 2rem;
     min-height: calc(100vh - 60px);
   }
 }
@@ -100,6 +100,19 @@
 .badge--in-progress  { background: #fef9c3; color: #854d0e; }
 .badge--pending      { background: #f3f4f6; color: #374151; }
 .badge--failed       { background: #fee2e2; color: #991b1b; }
+
+/* ── Region tag ── */
+.region-tag {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--hover-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
 
 /* ── Footer ── */
 .footer {

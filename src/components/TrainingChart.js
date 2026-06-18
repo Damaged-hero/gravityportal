@@ -22,6 +22,7 @@ function buildData(records, groupBy) {
     const month = r.submittedDate.slice(0, 7);
     const key = groupBy === 'status' ? r.status
               : groupBy === 'course' ? r.course
+              : groupBy === 'region' ? r.region
               : 'Total';
     keys.add(key);
     if (!byMonth[month]) byMonth[month] = { month };
@@ -35,8 +36,9 @@ function buildData(records, groupBy) {
 }
 
 export const GROUP_OPTIONS = [
-  { value: 'all',    label: 'All (single line)' },
+  { value: 'all',    label: 'All' },
   { value: 'status', label: 'By Status' },
+  { value: 'region', label: 'By Region' },
   { value: 'course', label: 'By Course' },
 ];
 

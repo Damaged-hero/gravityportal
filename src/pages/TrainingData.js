@@ -3,7 +3,8 @@ import { mockTrainingRecords } from '../mock/trainingData';
 import TrainingChart, { GROUP_OPTIONS } from '../components/TrainingChart';
 import './TrainingData.css';
 
-const ALL_STATUSES = ['All', 'Completed', 'In Progress', 'Pending', 'Failed'];
+const ALL_STATUSES = ['All', 'Completed', 'Failed', 'Pending'];
+const ALL_REGIONS  = ['All', 'DRC', 'Ghana', 'Madagascar', 'Malawi', 'Oman', 'Senegal'];
 
 function fmt(dateStr) {
   if (!dateStr) return '—';
@@ -31,14 +32,43 @@ function ChartIcon() {
   );
 }
 
+const COLUMNS = [
+  { key: 'candidateName', label: 'Candidate' },
+  { key: 'region',        label: 'Region' },
+  { key: 'course',        label: 'Course' },
+  { key: 'company',       label: 'Company' },
+  { key: 'trainingDate',  label: 'Start Date' },
+  { key: 'endDate',       label: 'End Date' },
+  { key: 'status',        label: 'Status' },
+  { key: 'venue',         label: 'Venue' },
+  { key: 'expiryDate',    label: 'Revalidation' },
+];
+
+function SortIcon({ dir }) {
+  if (!dir) return <span className="sort-icon sort-icon--none">⇅</span>;
+  return <span className="sort-icon">{dir === 'asc' ? '↑' : '↓'}</span>;
+}
+
 export default function TrainingData() {
   const [search, setSearch]       = useState('');
   const [status, setStatus]       = useState('All');
+  const [region, setRegion]       = useState('All');
   const [course, setCourse]       = useState('All');
   const [dateFrom, setDateFrom]   = useState('');
   const [dateTo, setDateTo]       = useState('');
   const [view, setView]           = useState('table');
   const [groupBy, setGroupBy]     = useState('status');
+  const [sortKey, setSortKey]     = useState('trainingDate');
+  const [sortDir, setSortDir]     = useState('desc');
+
+  function handleSort(key) {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
 
   const courses = useMemo(() => {
     const unique = [...new Set(mockTrainingRecords.map(r => r.course))].sort();
@@ -47,6 +77,7 @@ export default function TrainingData() {
 
   const activeFilterCount = [
     status !== 'All',
+    region !== 'All',
     course !== 'All',
     !!dateFrom,
     !!dateTo,
@@ -54,24 +85,33 @@ export default function TrainingData() {
   ].filter(Boolean).length;
 
   function clearFilters() {
-    setSearch(''); setStatus('All'); setCourse('All');
+    setSearch(''); setStatus('All'); setRegion('All'); setCourse('All');
     setDateFrom(''); setDateTo('');
   }
 
-  const filtered = useMemo(() => mockTrainingRecords.filter(r => {
+  const filtered = useMemo(() => {
+    const f = mockTrainingRecords.filter(r => {
     if (status !== 'All' && r.status !== status) return false;
+    if (region !== 'All' && r.region !== region) return false;
     if (course !== 'All' && r.course !== course) return false;
-    if (dateFrom && r.submittedDate < dateFrom) return false;
-    if (dateTo   && r.submittedDate > dateTo)   return false;
+    if (dateFrom && r.trainingDate < dateFrom) return false;
+    if (dateTo   && r.trainingDate > dateTo)   return false;
     const q = search.toLowerCase();
     if (q && !(
       r.candidateName.toLowerCase().includes(q) ||
       r.course.toLowerCase().includes(q) ||
-      r.idNumber.includes(q) ||
-      (r.certificateNumber && r.certificateNumber.toLowerCase().includes(q))
+      (r.company && r.company.toLowerCase().includes(q)) ||
+      (r.venue && r.venue.toLowerCase().includes(q))
     )) return false;
     return true;
-  }), [search, status, course, dateFrom, dateTo]);
+    });
+    return [...f].sort((a, b) => {
+      const av = a[sortKey] ?? '';
+      const bv = b[sortKey] ?? '';
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [search, status, region, course, dateFrom, dateTo, sortKey, sortDir]);
 
   return (
     <main className="page page--full">
@@ -121,7 +161,7 @@ export default function TrainingData() {
         <input
           className="td-search"
           type="search"
-          placeholder="Search name, course, ID, certificate…"
+          placeholder="Search name, course, company, venue…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -142,6 +182,21 @@ export default function TrainingData() {
         </div>
 
         <div className="td-filter-group">
+          <label className="td-filter-label">Region</label>
+          <div className="td-pills">
+            {ALL_REGIONS.map(r => (
+              <button
+                key={r}
+                className={`filter-btn${region === r ? ' filter-btn--active' : ''}`}
+                onClick={() => setRegion(r)}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="td-filter-group">
           <label className="td-filter-label">Course</label>
           <select
             className="td-select"
@@ -153,7 +208,7 @@ export default function TrainingData() {
         </div>
 
         <div className="td-filter-group">
-          <label className="td-filter-label">Submitted from</label>
+          <label className="td-filter-label">Training from</label>
           <input
             className="td-date"
             type="date"
@@ -186,35 +241,40 @@ export default function TrainingData() {
             <table className="td-table">
               <thead>
                 <tr>
-                  <th>Candidate</th>
-                  <th>ID Number</th>
-                  <th>Course</th>
-                  <th>Submitted</th>
-                  <th>Training Date</th>
-                  <th>Status</th>
-                  <th>Certificate #</th>
-                  <th>Expiry</th>
+                  {COLUMNS.map(col => (
+                    <th
+                      key={col.key}
+                      className={`th-sortable${sortKey === col.key ? ' th-sorted' : ''}`}
+                      onClick={() => handleSort(col.key)}
+                    >
+                      <span className="th-inner">
+                        {col.label}
+                        <SortIcon dir={sortKey === col.key ? sortDir : null} />
+                      </span>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="td-empty">No records match your filters.</td>
+                    <td colSpan={9} className="td-empty">No records match your filters.</td>
                   </tr>
                 ) : (
                   filtered.map(r => (
                     <tr key={r.id}>
                       <td className="td-name">{r.candidateName}</td>
-                      <td className="td-mono">{r.idNumber}</td>
+                      <td><span className="region-tag">{r.region}</span></td>
                       <td>{r.course}</td>
-                      <td>{fmt(r.submittedDate)}</td>
+                      <td>{r.company ?? '—'}</td>
                       <td>{fmt(r.trainingDate)}</td>
+                      <td>{fmt(r.endDate)}</td>
                       <td>
                         <span className={`badge badge--${r.status.replace(' ', '-').toLowerCase()}`}>
                           {r.status}
                         </span>
                       </td>
-                      <td className="td-mono">{r.certificateNumber ?? '—'}</td>
+                      <td>{r.venue ?? '—'}</td>
                       <td className={r.expiryDate && isExpiringSoon(r.expiryDate) ? 'td-expiry-warn' : ''}>
                         {fmt(r.expiryDate)}
                       </td>

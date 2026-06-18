@@ -135,7 +135,9 @@
 
 /* ── Table ── */
 .td-table-wrap {
-  overflow-x: auto;
+  overflow-x: scroll;
+  overflow-y: auto;
+  max-height: calc(100vh - 320px);
   border: 1px solid var(--border);
   border-radius: 10px;
   -webkit-overflow-scrolling: touch;
@@ -144,29 +146,76 @@
 .td-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
-  min-width: 700px;
+  font-size: 0.82rem;
+  min-width: 1440px;
+  table-layout: fixed;
 }
 
-.td-table thead tr { background: var(--hover-bg); }
+.td-table thead tr {
+  background: var(--nav-bg);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
 
 .td-table th {
   text-align: left;
-  padding: 0.65rem 0.85rem;
+  padding: 0.6rem 0.75rem;
   font-weight: 600;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* column widths — table is min-width:1440px so these are absolute */
+.td-table th:nth-child(1) { width: 200px; } /* Candidate */
+.td-table th:nth-child(2) { width: 105px; } /* Region */
+.td-table th:nth-child(3) { width: 260px; } /* Course */
+.td-table th:nth-child(4) { width: 165px; } /* Company */
+.td-table th:nth-child(5) { width: 110px; } /* Start Date */
+.td-table th:nth-child(6) { width: 110px; } /* End Date */
+.td-table th:nth-child(7) { width: 105px; } /* Status */
+.td-table th:nth-child(8) { width: 165px; } /* Venue */
+.td-table th:nth-child(9) { width: 110px; } /* Revalidation */
+
+/* sortable header */
+.th-sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.th-sortable:hover { color: var(--text); }
+.th-sorted         { color: var(--accent); }
+
+.th-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sort-icon {
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+.sort-icon--none {
+  opacity: 0.35;
+  font-size: 0.7rem;
 }
 
 .td-table td {
-  padding: 0.7rem 0.85rem;
+  padding: 0.6rem 0.75rem;
   border-bottom: 1px solid var(--border);
   color: var(--text);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .td-table tbody tr:last-child td { border-bottom: none; }
