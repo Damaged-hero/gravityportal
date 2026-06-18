@@ -82,6 +82,7 @@
 }
 
 .user-avatar:hover { border-color: var(--accent); color: var(--accent); }
+.user-avatar-img   { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; display: block; }
 
 /* Dropdown */
 .user-dropdown {

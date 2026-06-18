@@ -1,6 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { dataverseScopes, DATAVERSE_URL } from './msalConfig';
+
+// Module-level cache — survives page navigation within the same session
+const sessionCache = new Map();
+// In-flight promise dedup — prevents the same query running twice simultaneously
+const inFlight = new Map();
 
 async function fetchAllPages(url, headers) {
   const results = [];
@@ -10,18 +15,41 @@ async function fetchAllPages(url, headers) {
     if (!res.ok) throw new Error(`Dataverse error ${res.status}: ${await res.text()}`);
     const json = await res.json();
     results.push(...(json.value ?? []));
-    // Dataverse sends @odata.nextLink for pages beyond the first
     next = json['@odata.nextLink'] ?? null;
   }
   return results;
 }
 
+async function fetchWithDedup(cacheKey, url, headers) {
+  if (sessionCache.has(cacheKey)) return sessionCache.get(cacheKey);
+  if (inFlight.has(cacheKey)) return inFlight.get(cacheKey);
+
+  const promise = fetchAllPages(url, headers).then(results => {
+    sessionCache.set(cacheKey, results);
+    inFlight.delete(cacheKey);
+    return results;
+  }).catch(err => {
+    inFlight.delete(cacheKey);
+    throw err;
+  });
+
+  inFlight.set(cacheKey, promise);
+  return promise;
+}
+
+export function clearDataverseCache() {
+  sessionCache.clear();
+  inFlight.clear();
+}
+
 export function useDataverse(table, odata = '') {
   const { instance, accounts } = useMsal();
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData]     = useState(() => {
+    const key = `${table}?${odata}`;
+    return sessionCache.get(key) ?? null;
+  });
+  const [loading, setLoading] = useState(() => !sessionCache.has(`${table}?${odata}`));
   const [error, setError]     = useState(null);
-  const cacheRef              = useRef({});
 
   useEffect(() => {
     if (!accounts.length || !table) {
@@ -30,8 +58,9 @@ export function useDataverse(table, odata = '') {
     }
 
     const cacheKey = `${table}?${odata}`;
-    if (cacheRef.current[cacheKey]) {
-      setData(cacheRef.current[cacheKey]);
+
+    if (sessionCache.has(cacheKey)) {
+      setData(sessionCache.get(cacheKey));
       setLoading(false);
       return;
     }
@@ -48,28 +77,25 @@ export function useDataverse(table, odata = '') {
         });
 
         const headers = {
-          Authorization:  `Bearer ${accessToken}`,
-          Accept:         'application/json',
+          Authorization:      `Bearer ${accessToken}`,
+          Accept:             'application/json',
           'OData-MaxVersion': '4.0',
           'OData-Version':    '4.0',
-          // return display names for all lookup / option-set fields
-          'Prefer': 'odata.include-annotations="OData.Community.Display.V1.FormattedValue"',
+          'Prefer':           'odata.include-annotations="OData.Community.Display.V1.FormattedValue"',
         };
 
         const url = `${DATAVERSE_URL}/${table}${odata ? `?${odata}` : ''}`;
-        // expose token for one-time dev metadata queries in mapper
-        window.__dvToken = accessToken;
-
-        const results = await fetchAllPages(url, headers);
+        const results = await fetchWithDedup(cacheKey, url, headers);
 
         if (!cancelled) {
-          cacheRef.current[cacheKey] = results;
           setData(results);
+          setLoading(false);
         }
       } catch (err) {
-        if (!cancelled) setError(err.message);
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setError(err.message);
+          setLoading(false);
+        }
       }
     }
 

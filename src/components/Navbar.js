@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { dataverseScopes } from '../auth/msalConfig';
+import { useProfilePhoto } from '../auth/useProfilePhoto';
 import './Navbar.css';
 
 export default function Navbar() {
@@ -10,6 +11,7 @@ export default function Navbar() {
   const { instance, accounts } = useMsal();
   const isAuthenticated = useIsAuthenticated();
   const userName = accounts[0]?.name ?? accounts[0]?.username ?? '';
+  const photoUrl = useProfilePhoto();
 
   function signIn() {
     instance.loginRedirect({ scopes: dataverseScopes });
@@ -74,9 +76,12 @@ export default function Navbar() {
           {/* user avatar + dropdown */}
           <div className="navbar-user" ref={dropdownRef}>
             <button className="user-avatar" onClick={() => setDropdownOpen(p => !p)} aria-label="User menu">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-                <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-              </svg>
+              {photoUrl
+                ? <img src={photoUrl} alt={userName} className="user-avatar-img" />
+                : <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                  </svg>
+              }
             </button>
             {dropdownOpen && (
               <div className="user-dropdown">

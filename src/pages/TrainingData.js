@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useTrainingRecords } from '../auth/useTrainingRecords';
+import { useUserProfile } from '../auth/useUserProfile';
 import TrainingChart, { GROUP_OPTIONS } from '../components/TrainingChart';
 import './TrainingData.css';
 
@@ -57,6 +58,9 @@ export default function TrainingData() {
   const [groupBy, setGroupBy]     = useState('status');
   const [sortKey, setSortKey]     = useState('trainingDate');
   const [sortDir, setSortDir]     = useState('desc');
+  const [page, setPage]           = useState(0);
+
+  const PAGE_SIZE = 500;
 
   function handleSort(key) {
     if (sortKey === key) {
@@ -68,6 +72,8 @@ export default function TrainingData() {
   }
 
   const { records, loading, error } = useTrainingRecords();
+  const { companyName, isGravity } = useUserProfile();
+
 
   const statuses = useMemo(() => {
     const unique = [...new Set(records.map(r => r.status).filter(Boolean))].sort();
@@ -95,32 +101,39 @@ export default function TrainingData() {
 
   function clearFilters() {
     setSearch(''); setStatus('All'); setVenue('All'); setCourse('All');
-    setDateFrom(''); setDateTo('');
+    setDateFrom(''); setDateTo(''); setPage(0);
   }
 
   const filtered = useMemo(() => {
-    const f = records.filter(r => {
-    if (status !== 'All' && r.status !== status) return false;
-    if (venue !== 'All' && r.venue !== venue) return false;
-    if (course !== 'All' && r.course !== course) return false;
-    if (dateFrom && r.trainingDate < dateFrom) return false;
-    if (dateTo   && r.trainingDate > dateTo)   return false;
+    setPage(0);
     const q = search.toLowerCase();
-    if (q && !(
-      r.candidateName.toLowerCase().includes(q) ||
-      r.course.toLowerCase().includes(q) ||
-      (r.company && r.company.toLowerCase().includes(q)) ||
-      (r.venue && r.venue.toLowerCase().includes(q))
-    )) return false;
-    return true;
+    return records.filter(r => {
+      if (status !== 'All' && r.status !== status) return false;
+      if (venue  !== 'All' && r.venue  !== venue)  return false;
+      if (course !== 'All' && r.course !== course) return false;
+      if (dateFrom && r.trainingDate < dateFrom) return false;
+      if (dateTo   && r.trainingDate > dateTo)   return false;
+      if (q && !(
+        r._search.includes(q) ||
+        r.course.toLowerCase().includes(q) ||
+        (r.company && r.company.toLowerCase().includes(q)) ||
+        (r.venue && r.venue.toLowerCase().includes(q))
+      )) return false;
+      return true;
     });
-    return [...f].sort((a, b) => {
+  }, [records, search, status, venue, course, dateFrom, dateTo]);
+
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
       const av = a[sortKey] ?? '';
       const bv = b[sortKey] ?? '';
       const cmp = av < bv ? -1 : av > bv ? 1 : 0;
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [records, search, status, venue, course, dateFrom, dateTo, sortKey, sortDir]);
+  }, [filtered, sortKey, sortDir]);
+
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  const paginated  = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   if (loading) return <main className="page page--full"><p style={{color:'var(--text-muted)', padding:'2rem 0'}}>Loading live data…</p></main>;
   if (error)   return <main className="page page--full"><p style={{color:'#d2232a', padding:'2rem 0'}}>Dataverse error: {error}</p></main>;
@@ -129,8 +142,8 @@ export default function TrainingData() {
     <main className="page page--full">
       <div className="td-header">
         <div>
-          <h1>Training Data</h1>
-          <p>All candidates submitted for training on your account.</p>
+          <h1>{isGravity ? 'Gravity' : (companyName ?? 'Training Data')}</h1>
+          <p>Training records</p>
         </div>
         <div className="td-view-controls">
           {view === 'chart' && (
@@ -264,12 +277,12 @@ export default function TrainingData() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {sorted.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="td-empty">No records match your filters.</td>
                   </tr>
                 ) : (
-                  filtered.map(r => (
+                  paginated.map(r => (
                     <tr key={r.id}>
                       <td className="td-name">{r.candidateName}</td>
                       <td>{r.course}</td>
@@ -291,7 +304,20 @@ export default function TrainingData() {
               </tbody>
             </table>
           </div>
-          <p className="td-count">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</p>
+          <div className="td-pagination">
+            <span className="td-count">
+              {filtered.length} record{filtered.length !== 1 ? 's' : ''}
+              {totalPages > 1 && ` — page ${page + 1} of ${totalPages}`}
+            </span>
+            {totalPages > 1 && (
+              <div className="td-page-controls">
+                <button className="td-page-btn" onClick={() => setPage(0)}          disabled={page === 0}>««</button>
+                <button className="td-page-btn" onClick={() => setPage(p => p - 1)} disabled={page === 0}>‹ Prev</button>
+                <button className="td-page-btn" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages - 1}>Next ›</button>
+                <button className="td-page-btn" onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1}>»»</button>
+              </div>
+            )}
+          </div>
         </>
       ) : (
         <TrainingChart records={filtered} groupBy={groupBy} />

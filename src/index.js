@@ -9,18 +9,9 @@ import reportWebVitals from './reportWebVitals';
 
 const msalInstance = new PublicClientApplication(msalConfig);
 
-console.log('[App] Starting MSAL initialize...');
 msalInstance.initialize().then(() => {
-  console.log('[App] MSAL initialized OK');
-  msalInstance.handleRedirectPromise()
-    .then(result => {
-      if (result) console.log('[App] Redirect result:', result.account?.username);
-      else console.log('[App] No redirect result (normal on first load)');
-    })
-    .catch(e => console.error('[App] handleRedirectPromise error:', e));
-
+  msalInstance.handleRedirectPromise().catch(console.error);
   const root = ReactDOM.createRoot(document.getElementById('root'));
-  console.log('[App] Rendering React app...');
   root.render(
     <React.StrictMode>
       <MsalProvider instance={msalInstance}>
@@ -28,10 +19,6 @@ msalInstance.initialize().then(() => {
       </MsalProvider>
     </React.StrictMode>
   );
-  console.log('[App] Render called');
-}).catch(e => console.error('[App] MSAL initialize failed:', e));
+}).catch(e => console.error('[MSAL] initialize failed:', e));
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
