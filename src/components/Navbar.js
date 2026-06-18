@@ -68,6 +68,9 @@ export default function Navbar() {
         </ul>
 
         <div className="navbar-right">
+          {!isAuthenticated && (
+            <button className="auth-btn auth-btn--in" onClick={signIn}>Sign in with Microsoft</button>
+          )}
           {/* user avatar + dropdown */}
           <div className="navbar-user" ref={dropdownRef}>
             <button className="user-avatar" onClick={() => setDropdownOpen(p => !p)} aria-label="User menu">

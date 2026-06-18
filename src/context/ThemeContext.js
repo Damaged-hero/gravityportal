@@ -10,9 +10,10 @@ function storageKey(accountId) {
 function loadTheme(accountId) {
   try {
     const raw = localStorage.getItem(storageKey(accountId));
-    if (raw) return JSON.parse(raw).theme ?? 'dark';
+    if (raw) return JSON.parse(raw).theme ?? 'light';
   } catch {}
-  return 'dark';
+  // fall back to OS preference
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 function saveTheme(accountId, theme) {
