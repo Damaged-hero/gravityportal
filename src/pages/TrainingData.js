@@ -1,10 +1,8 @@
 import { useState, useMemo } from 'react';
-import { mockTrainingRecords } from '../mock/trainingData';
+import { useTrainingRecords } from '../auth/useTrainingRecords';
 import TrainingChart, { GROUP_OPTIONS } from '../components/TrainingChart';
 import './TrainingData.css';
 
-const ALL_STATUSES = ['All', 'Completed', 'Failed', 'Pending'];
-const ALL_REGIONS  = ['All', 'DRC', 'Ghana', 'Madagascar', 'Malawi', 'Oman', 'Senegal'];
 
 function fmt(dateStr) {
   if (!dateStr) return '—';
@@ -34,13 +32,12 @@ function ChartIcon() {
 
 const COLUMNS = [
   { key: 'candidateName', label: 'Candidate' },
-  { key: 'region',        label: 'Region' },
   { key: 'course',        label: 'Course' },
   { key: 'company',       label: 'Company' },
+  { key: 'venue',         label: 'Venue' },
   { key: 'trainingDate',  label: 'Start Date' },
   { key: 'endDate',       label: 'End Date' },
   { key: 'status',        label: 'Status' },
-  { key: 'venue',         label: 'Venue' },
   { key: 'expiryDate',    label: 'Revalidation' },
 ];
 
@@ -52,7 +49,7 @@ function SortIcon({ dir }) {
 export default function TrainingData() {
   const [search, setSearch]       = useState('');
   const [status, setStatus]       = useState('All');
-  const [region, setRegion]       = useState('All');
+  const [venue, setVenue]         = useState('All');
   const [course, setCourse]       = useState('All');
   const [dateFrom, setDateFrom]   = useState('');
   const [dateTo, setDateTo]       = useState('');
@@ -70,14 +67,26 @@ export default function TrainingData() {
     }
   }
 
-  const courses = useMemo(() => {
-    const unique = [...new Set(mockTrainingRecords.map(r => r.course))].sort();
+  const { records, loading, error } = useTrainingRecords();
+
+  const statuses = useMemo(() => {
+    const unique = [...new Set(records.map(r => r.status).filter(Boolean))].sort();
     return ['All', ...unique];
-  }, []);
+  }, [records]);
+
+  const venues = useMemo(() => {
+    const unique = [...new Set(records.map(r => r.venue).filter(Boolean))].sort();
+    return ['All', ...unique];
+  }, [records]);
+
+  const courses = useMemo(() => {
+    const unique = [...new Set(records.map(r => r.course).filter(Boolean))].sort();
+    return ['All', ...unique];
+  }, [records]);
 
   const activeFilterCount = [
     status !== 'All',
-    region !== 'All',
+    venue !== 'All',
     course !== 'All',
     !!dateFrom,
     !!dateTo,
@@ -85,14 +94,14 @@ export default function TrainingData() {
   ].filter(Boolean).length;
 
   function clearFilters() {
-    setSearch(''); setStatus('All'); setRegion('All'); setCourse('All');
+    setSearch(''); setStatus('All'); setVenue('All'); setCourse('All');
     setDateFrom(''); setDateTo('');
   }
 
   const filtered = useMemo(() => {
-    const f = mockTrainingRecords.filter(r => {
+    const f = records.filter(r => {
     if (status !== 'All' && r.status !== status) return false;
-    if (region !== 'All' && r.region !== region) return false;
+    if (venue !== 'All' && r.venue !== venue) return false;
     if (course !== 'All' && r.course !== course) return false;
     if (dateFrom && r.trainingDate < dateFrom) return false;
     if (dateTo   && r.trainingDate > dateTo)   return false;
@@ -111,7 +120,10 @@ export default function TrainingData() {
       const cmp = av < bv ? -1 : av > bv ? 1 : 0;
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [search, status, region, course, dateFrom, dateTo, sortKey, sortDir]);
+  }, [records, search, status, venue, course, dateFrom, dateTo, sortKey, sortDir]);
+
+  if (loading) return <main className="page page--full"><p style={{color:'var(--text-muted)', padding:'2rem 0'}}>Loading live data…</p></main>;
+  if (error)   return <main className="page page--full"><p style={{color:'#d2232a', padding:'2rem 0'}}>Dataverse error: {error}</p></main>;
 
   return (
     <main className="page page--full">
@@ -169,7 +181,7 @@ export default function TrainingData() {
         <div className="td-filter-group">
           <label className="td-filter-label">Status</label>
           <div className="td-pills">
-            {ALL_STATUSES.map(s => (
+            {statuses.map(s => (
               <button
                 key={s}
                 className={`filter-btn${status === s ? ' filter-btn--active' : ''}`}
@@ -182,18 +194,14 @@ export default function TrainingData() {
         </div>
 
         <div className="td-filter-group">
-          <label className="td-filter-label">Region</label>
-          <div className="td-pills">
-            {ALL_REGIONS.map(r => (
-              <button
-                key={r}
-                className={`filter-btn${region === r ? ' filter-btn--active' : ''}`}
-                onClick={() => setRegion(r)}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+          <label className="td-filter-label">Venue</label>
+          <select
+            className="td-select"
+            value={venue}
+            onChange={e => setVenue(e.target.value)}
+          >
+            {venues.map(v => <option key={v}>{v}</option>)}
+          </select>
         </div>
 
         <div className="td-filter-group">
@@ -258,15 +266,15 @@ export default function TrainingData() {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="td-empty">No records match your filters.</td>
+                    <td colSpan={8} className="td-empty">No records match your filters.</td>
                   </tr>
                 ) : (
                   filtered.map(r => (
                     <tr key={r.id}>
                       <td className="td-name">{r.candidateName}</td>
-                      <td><span className="region-tag">{r.region}</span></td>
                       <td>{r.course}</td>
                       <td>{r.company ?? '—'}</td>
+                      <td>{r.venue ?? '—'}</td>
                       <td>{fmt(r.trainingDate)}</td>
                       <td>{fmt(r.endDate)}</td>
                       <td>
@@ -274,7 +282,6 @@ export default function TrainingData() {
                           {r.status}
                         </span>
                       </td>
-                      <td>{r.venue ?? '—'}</td>
                       <td className={r.expiryDate && isExpiringSoon(r.expiryDate) ? 'td-expiry-warn' : ''}>
                         {fmt(r.expiryDate)}
                       </td>

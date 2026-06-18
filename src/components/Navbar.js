@@ -1,10 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { useMsal, useIsAuthenticated } from '@azure/msal-react';
+import { dataverseScopes } from '../auth/msalConfig';
 import './Navbar.css';
 
 export default function Navbar() {
   const { isDark, toggle } = useTheme();
+  const { instance, accounts } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
+  const userName = accounts[0]?.name ?? accounts[0]?.username ?? '';
+
+  function signIn() {
+    instance.loginRedirect({ scopes: dataverseScopes });
+  }
+  function signOut() {
+    instance.logoutRedirect({ account: accounts[0] });
+  }
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [menuOpen, setMenuOpen]         = useState(false);
   const [hidden, setHidden]             = useState(false);
@@ -65,6 +77,11 @@ export default function Navbar() {
             </button>
             {dropdownOpen && (
               <div className="user-dropdown">
+                {isAuthenticated && (
+                  <div className="dropdown-section dropdown-user-info">
+                    <span className="dropdown-user-name">{userName}</span>
+                  </div>
+                )}
                 <div className="dropdown-section">
                   <span className="dropdown-label">Theme</span>
                   <label className="toggle-switch">
@@ -72,6 +89,12 @@ export default function Navbar() {
                     <span className="toggle-track"><span className="toggle-thumb" /></span>
                     <span className="toggle-text">{isDark ? 'Dark' : 'Light'}</span>
                   </label>
+                </div>
+                <div className="dropdown-section">
+                  {isAuthenticated
+                    ? <button className="auth-btn auth-btn--out" onClick={signOut}>Sign out</button>
+                    : <button className="auth-btn auth-btn--in"  onClick={signIn}>Sign in with Microsoft</button>
+                  }
                 </div>
               </div>
             )}

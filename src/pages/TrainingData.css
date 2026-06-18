@@ -174,14 +174,13 @@
 
 /* column widths — table is min-width:1440px so these are absolute */
 .td-table th:nth-child(1) { width: 200px; } /* Candidate */
-.td-table th:nth-child(2) { width: 105px; } /* Region */
-.td-table th:nth-child(3) { width: 260px; } /* Course */
-.td-table th:nth-child(4) { width: 165px; } /* Company */
+.td-table th:nth-child(2) { width: 260px; } /* Course */
+.td-table th:nth-child(3) { width: 165px; } /* Company */
+.td-table th:nth-child(4) { width: 165px; } /* Venue */
 .td-table th:nth-child(5) { width: 110px; } /* Start Date */
 .td-table th:nth-child(6) { width: 110px; } /* End Date */
 .td-table th:nth-child(7) { width: 105px; } /* Status */
-.td-table th:nth-child(8) { width: 165px; } /* Venue */
-.td-table th:nth-child(9) { width: 110px; } /* Revalidation */
+.td-table th:nth-child(8) { width: 110px; } /* Revalidation */
 
 /* sortable header */
 .th-sortable {

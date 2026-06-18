@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { mockClient, mockTrainingRecords } from '../mock/trainingData';
+import { useMsal } from '@azure/msal-react';
+import { useTrainingRecords } from '../auth/useTrainingRecords';
 import './Home.css';
 
 const STATUS_COLOURS = {
@@ -20,7 +21,6 @@ function StatCard({ label, value, sub, accent }) {
   );
 }
 
-// Pure SVG donut — no recharts dependency
 function DonutChart({ data, total }) {
   const cx = 110, cy = 110, r = 80, stroke = 28;
   const circumference = 2 * Math.PI * r;
@@ -48,7 +48,7 @@ function DonutChart({ data, total }) {
         />
       ))}
       <text x={cx} y={cy - 8} textAnchor="middle" fontSize="28" fontWeight="700" fill="currentColor">{total}</text>
-      <text x={cx} y={cy + 16} textAnchor="middle" fontSize="12" fill="#6b7280">learners</text>
+      <text x={cx} y={cy + 16} textAnchor="middle" fontSize="12" fill="#6b7280">enrolments</text>
     </svg>
   );
 }
@@ -76,7 +76,7 @@ function StatusPieChart({ records }) {
   return (
     <div className="pie-card">
       <div className="pie-card-header">
-        <h2>Learners by Status</h2>
+        <h2>Enrolments by Status</h2>
         <div className="pie-date-range">
           <input type="date" className="pie-date-input" value={dateFrom} onChange={e => setDateFrom(e.target.value)} title="From date" />
           <span className="pie-date-sep">—</span>
@@ -104,29 +104,30 @@ function StatusPieChart({ records }) {
   );
 }
 
-function RegionBarChart({ records }) {
+function VenueBarChart({ records }) {
   const data = useMemo(() => {
     const counts = {};
-    records.forEach(r => { counts[r.region] = (counts[r.region] || 0) + 1; });
+    records.forEach(r => {
+      const key = r.venue || 'Unknown';
+      counts[key] = (counts[key] || 0) + 1;
+    });
     return Object.entries(counts)
-      .map(([region, count]) => ({ region, count }))
-      .sort((a, b) => b.count - a.count);
+      .map(([venue, count]) => ({ venue, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
   }, [records]);
 
   const max = data.length ? data[0].count : 1;
 
   return (
     <div className="pie-card">
-      <div className="pie-card-header"><h2>Learners by Region</h2></div>
+      <div className="pie-card-header"><h2>Enrolments by Venue</h2></div>
       <div className="region-bars">
-        {data.map(({ region, count }) => (
-          <div key={region} className="region-bar-row">
-            <span className="region-bar-label">{region}</span>
+        {data.map(({ venue, count }) => (
+          <div key={venue} className="region-bar-row">
+            <span className="region-bar-label">{venue}</span>
             <div className="region-bar-track">
-              <div
-                className="region-bar-fill"
-                style={{ width: `${(count / max) * 100}%` }}
-              />
+              <div className="region-bar-fill" style={{ width: `${(count / max) * 100}%` }} />
             </div>
             <span className="region-bar-count">{count}</span>
           </div>
@@ -137,18 +138,24 @@ function RegionBarChart({ records }) {
 }
 
 export default function Home() {
-  const records = mockTrainingRecords;
+  const { accounts } = useMsal();
+  const userName = accounts[0]?.name ?? accounts[0]?.username ?? '';
 
-  const completed    = records.filter(r => r.status === 'Completed').length;
-  const failed       = records.filter(r => r.status === 'Failed').length;
-  const pending      = records.filter(r => r.status === 'Pending').length;
-  const expiringSoon = records.filter(r => {
+  const { records, loading, error } = useTrainingRecords();
+
+  if (loading) return <main className="page"><p style={{color:'var(--text-muted)'}}>Loading live data…</p></main>;
+  if (error)   return <main className="page"><p style={{color:'#d2232a'}}>Dataverse error: {error}</p></main>;
+
+  const uniqueLearners = new Set(records.map(r => r.idNumber || r.candidateName)).size;
+  const completed      = records.filter(r => r.status === 'Completed').length;
+  const failed         = records.filter(r => r.status === 'Failed').length;
+  const pending        = records.filter(r => r.status === 'Pending').length;
+  const expiringSoon   = records.filter(r => {
     if (!r.expiryDate) return false;
     const diff = (new Date(r.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
     return diff > 0 && diff <= 180;
   }).length;
-
-  const regions = [...new Set(records.map(r => r.region))].length;
+  const venues = [...new Set(records.map(r => r.venue).filter(Boolean))].length;
 
   const recent = [...records]
     .filter(r => r.trainingDate)
@@ -159,26 +166,24 @@ export default function Home() {
     <main className="page">
       <div className="home-header">
         <div>
-          <h1>Welcome back</h1>
-          <p className="home-client-name">{mockClient.name}</p>
+          <h1>Welcome back{userName ? `, ${userName.split(' ')[0]}` : ''}</h1>
+          <p className="home-client-name">Here's an overview of your training activity.</p>
         </div>
       </div>
 
       <div className="home-body">
-        {/* Left — charts */}
         <div className="home-left">
           <StatusPieChart records={records} />
-          <RegionBarChart records={records} />
+          <VenueBarChart records={records} />
         </div>
 
-        {/* Right — stats + recent */}
         <div className="home-right">
           <div className="stat-grid">
-            <StatCard label="Total Learners" value={records.length} />
+            <StatCard label="Total Learners" value={uniqueLearners} sub={`${records.length} enrolments`} />
             <StatCard label="Competent" value={completed} />
             <StatCard label="Not Yet Competent" value={failed} accent={failed > 0} />
             <StatCard label="Pending" value={pending} />
-            <StatCard label="Regions" value={regions} sub="countries trained" />
+            <StatCard label="Venues" value={venues} sub="training locations" />
             <StatCard label="Revalidation Due" value={expiringSoon} sub="within 6 months" accent={expiringSoon > 0} />
           </div>
 
@@ -189,8 +194,8 @@ export default function Home() {
                 <thead>
                   <tr>
                     <th>Candidate</th>
-                    <th>Region</th>
                     <th>Course</th>
+                    <th>Venue</th>
                     <th>Date</th>
                     <th>Status</th>
                   </tr>
@@ -199,8 +204,8 @@ export default function Home() {
                   {recent.map(r => (
                     <tr key={r.id}>
                       <td>{r.candidateName}</td>
-                      <td><span className="region-tag">{r.region}</span></td>
                       <td>{r.course}</td>
+                      <td>{r.venue ?? '—'}</td>
                       <td>{new Date(r.trainingDate).toLocaleDateString('en-ZA')}</td>
                       <td>
                         <span className={`badge badge--${r.status.replace(' ', '-').toLowerCase()}`}>

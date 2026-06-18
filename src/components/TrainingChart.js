@@ -19,10 +19,11 @@ function buildData(records, groupBy) {
   const keys = new Set();
 
   records.forEach(r => {
+    if (!r.submittedDate) return;
     const month = r.submittedDate.slice(0, 7);
     const key = groupBy === 'status' ? r.status
               : groupBy === 'course' ? r.course
-              : groupBy === 'region' ? r.region
+              : groupBy === 'venue'  ? r.venue
               : 'Total';
     keys.add(key);
     if (!byMonth[month]) byMonth[month] = { month };

@@ -229,6 +229,50 @@
   min-width: 28px;
 }
 
+/* ── Auth ── */
+.dropdown-user-info {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.dropdown-user-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.auth-btn {
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.auth-btn--in {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.auth-btn--in:hover  { opacity: 0.88; }
+
+.auth-btn--out {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.auth-btn--out:hover { background: var(--hover-bg); color: var(--text); }
+
 /* ─────────────────────────────────────────
    DESKTOP  ≥640px
 ───────────────────────────────────────── */
