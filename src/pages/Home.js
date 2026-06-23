@@ -149,7 +149,7 @@ const COL_HEADERS = {
 export default function Home() {
   const { accounts } = useMsal();
   const userName = accounts[0]?.name ?? accounts[0]?.username ?? '';
-  const { records, loading, error } = useTrainingRecords();
+  const { records } = useTrainingRecords();
   const [activeFilter, setActiveFilter] = useState('all');
   const { tooltip, show, hide } = useRowTooltip();
   const [rebookRecord, setRebookRecord] = useState(null);

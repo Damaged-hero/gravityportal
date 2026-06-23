@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useMsal, useIsAuthenticated } from '@azure/msal-react';
 import { dataverseScopes } from '../auth/msalConfig';
 import { useProfilePhoto } from '../auth/useProfilePhoto';
+import logo from '../assets/New-Generic.png';
 import './Navbar.css';
 
 export default function Navbar() {
@@ -60,7 +61,7 @@ export default function Navbar() {
     <>
       <nav className={`navbar${hidden ? ' navbar--hidden' : ''}`}>
         <div className="navbar-brand">
-          <img src="/New-Generic.png" alt="Gravity" className="navbar-logo" />
+          <img src={logo} alt="Gravity" className="navbar-logo" />
         </div>
 
         {/* desktop links */}
