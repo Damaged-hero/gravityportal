@@ -162,7 +162,7 @@ export default function Home() {
   const expiringSoon   = useMemo(() => records.filter(r => {
     if (!r.expiryDate) return false;
     const diff = (new Date(r.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
-    return diff > 0 && diff <= 180;
+    return diff <= 180;
   }).length, [records]);
 
   const tableRecords = useMemo(() => {
@@ -180,7 +180,7 @@ export default function Home() {
         return [...records].filter(r => {
           if (!r.expiryDate) return false;
           const diff = (new Date(r.expiryDate) - new Date()) / (1000 * 60 * 60 * 24);
-          return diff > 0 && diff <= 180;
+          return diff <= 180;
         }).sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate)).slice(0, 50);
       default:
         return [...records].filter(r => r.trainingDate)
@@ -228,7 +228,7 @@ export default function Home() {
             <StatCard label="Pending" value={pending}
               active={activeFilter === 'pending'} onClick={() => toggle('pending')} />
             <StatCard label="Venues" value={venues} sub="training locations" />
-            <StatCard label="Revalidation Due" value={expiringSoon} sub="within 6 months" accent={expiringSoon > 0}
+            <StatCard label="Revalidation Due" value={expiringSoon} sub="expiring or expired" accent={expiringSoon > 0}
               active={activeFilter === 'revalidation'} onClick={() => toggle('revalidation')} />
           </div>
 
