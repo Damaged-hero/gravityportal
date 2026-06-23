@@ -2,17 +2,21 @@ import { useState, useMemo } from 'react';
 import { useTrainingRecords } from '../auth/useTrainingRecords';
 import { useUserProfile } from '../auth/useUserProfile';
 import TrainingChart, { GROUP_OPTIONS } from '../components/TrainingChart';
+import { useRowTooltip, RowTooltip } from '../components/RowTooltip';
 import './TrainingData.css';
-
 
 function fmt(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-ZA');
 }
 
-function isExpiringSoon(dateStr) {
+function expiryClass(dateStr) {
+  if (!dateStr) return '';
   const diff = (new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24);
-  return diff > 0 && diff <= 180;
+  if (diff < 0)          return '';
+  if (diff <= 90)        return 'td-expiry-red';
+  if (diff <= 180)       return 'td-expiry-orange';
+  return 'td-expiry-green';
 }
 
 function TableIcon() {
@@ -31,79 +35,65 @@ function ChartIcon() {
   );
 }
 
-const COLUMNS = [
-  { key: 'candidateName', label: 'Candidate' },
-  { key: 'course',        label: 'Course' },
-  { key: 'company',       label: 'Company' },
-  { key: 'venue',         label: 'Venue' },
-  { key: 'trainingDate',  label: 'Start Date' },
-  { key: 'endDate',       label: 'End Date' },
-  { key: 'status',        label: 'Status' },
-  { key: 'expiryDate',    label: 'Revalidation' },
-];
-
 function SortIcon({ dir }) {
   if (!dir) return <span className="sort-icon sort-icon--none">⇅</span>;
   return <span className="sort-icon">{dir === 'asc' ? '↑' : '↓'}</span>;
 }
 
+const FIXED_COLS = [
+  { key: 'company',   label: 'Company' },
+  { key: 'firstName', label: 'First Name' },
+  { key: 'lastName',  label: 'Last Name' },
+  { key: 'idNumber',  label: 'ID Number' },
+];
+
+const PAGE_SIZE = 200;
+
 export default function TrainingData() {
-  const [search, setSearch]       = useState('');
-  const [status, setStatus]       = useState('All');
-  const [venue, setVenue]         = useState('All');
-  const [course, setCourse]       = useState('All');
-  const [dateFrom, setDateFrom]   = useState('');
-  const [dateTo, setDateTo]       = useState('');
-  const [view, setView]           = useState('table');
-  const [groupBy, setGroupBy]     = useState('status');
-  const [sortKey, setSortKey]     = useState('trainingDate');
-  const [sortDir, setSortDir]     = useState('desc');
-  const [page, setPage]           = useState(0);
-
-  const PAGE_SIZE = 500;
-
-  function handleSort(key) {
-    if (sortKey === key) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  }
+  const [search, setSearch]     = useState('');
+  const [status, setStatus]     = useState('All');
+  const [venue, setVenue]       = useState('All');
+  const [course, setCourse]     = useState('All');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
+  const [view, setView]         = useState('table');
+  const [groupBy, setGroupBy]   = useState('status');
+  const [sortKey, setSortKey]   = useState('latestDate');
+  const [sortDir, setSortDir]   = useState('desc');
+  const [page, setPage]         = useState(0);
 
   const { records, loading, error } = useTrainingRecords();
-  const { companyName, isGravity } = useUserProfile();
+  const { companyName, isGravity }  = useUserProfile();
+  const { tooltip, show, hide }     = useRowTooltip();
 
+  function handleSort(key) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  }
 
   const statuses = useMemo(() => {
-    const unique = [...new Set(records.map(r => r.status).filter(Boolean))].sort();
-    return ['All', ...unique];
+    const u = [...new Set(records.map(r => r.status).filter(Boolean))].sort();
+    return ['All', ...u];
   }, [records]);
 
   const venues = useMemo(() => {
-    const unique = [...new Set(records.map(r => r.venue).filter(Boolean))].sort();
-    return ['All', ...unique];
+    const u = [...new Set(records.map(r => r.venue).filter(Boolean))].sort();
+    return ['All', ...u];
   }, [records]);
 
   const courses = useMemo(() => {
-    const unique = [...new Set(records.map(r => r.course).filter(Boolean))].sort();
-    return ['All', ...unique];
+    const u = [...new Set(records.map(r => r.course).filter(Boolean))].sort();
+    return ['All', ...u];
   }, [records]);
 
-  const activeFilterCount = [
-    status !== 'All',
-    venue !== 'All',
-    course !== 'All',
-    !!dateFrom,
-    !!dateTo,
-    !!search,
-  ].filter(Boolean).length;
+  const activeFilterCount = [status !== 'All', venue !== 'All', course !== 'All', !!dateFrom, !!dateTo, !!search].filter(Boolean).length;
 
   function clearFilters() {
     setSearch(''); setStatus('All'); setVenue('All'); setCourse('All');
     setDateFrom(''); setDateTo(''); setPage(0);
   }
 
+  // filter individual enrollment records
   const filtered = useMemo(() => {
     setPage(0);
     const q = search.toLowerCase();
@@ -117,23 +107,59 @@ export default function TrainingData() {
         r._search.includes(q) ||
         r.course.toLowerCase().includes(q) ||
         (r.company && r.company.toLowerCase().includes(q)) ||
-        (r.venue && r.venue.toLowerCase().includes(q))
+        (r.idNumber && r.idNumber.toLowerCase().includes(q))
       )) return false;
       return true;
     });
   }, [records, search, status, venue, course, dateFrom, dateTo]);
 
+  // group by learner — one row per person
+  const learnerRows = useMemo(() => {
+    const map = new Map();
+    filtered.forEach(r => {
+      const key = r.idNumber || r.candidateName;
+      if (!map.has(key)) {
+        const parts = r.candidateName.trim().split(/\s+/);
+        map.set(key, {
+          key,
+          company:    r.company ?? '—',
+          firstName:  parts[0] ?? '',
+          lastName:   parts.slice(1).join(' ') || '—',
+          idNumber:   r.idNumber || '—',
+          latestDate: r.trainingDate ?? '',
+          _search:    r._search,
+          courses:    [],
+        });
+      }
+      const row = map.get(key);
+      if (r.trainingDate && r.trainingDate > row.latestDate) row.latestDate = r.trainingDate;
+      row.courses.push({
+        course:     r.course,
+        expiryDate: r.expiryDate,
+        status:     r.status,
+      });
+    });
+    return Array.from(map.values());
+  }, [filtered]);
+
+  const maxCourses = useMemo(() =>
+    Math.min(3, learnerRows.reduce((m, r) => Math.max(m, r.courses.length), 0)),
+  [learnerRows]);
+
   const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
+    return [...learnerRows].sort((a, b) => {
       const av = a[sortKey] ?? '';
       const bv = b[sortKey] ?? '';
-      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      const cmp = sortKey === 'latestDate'
+        ? av < bv ? -1 : av > bv ? 1 : 0
+        : av.toLowerCase() < bv.toLowerCase() ? -1 : av.toLowerCase() > bv.toLowerCase() ? 1 : 0;
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [filtered, sortKey, sortDir]);
+  }, [learnerRows, sortKey, sortDir]);
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const paginated  = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const totalCols  = FIXED_COLS.length + maxCourses * 2;
 
   if (loading) return <main className="page page--full"><p style={{color:'var(--text-muted)', padding:'2rem 0'}}>Loading live data…</p></main>;
   if (error)   return <main className="page page--full"><p style={{color:'#d2232a', padding:'2rem 0'}}>Dataverse error: {error}</p></main>;
@@ -151,11 +177,7 @@ export default function TrainingData() {
               <label className="td-filter-label">Lines by</label>
               <div className="td-pills">
                 {GROUP_OPTIONS.map(o => (
-                  <button
-                    key={o.value}
-                    className={`filter-btn${groupBy === o.value ? ' filter-btn--active' : ''}`}
-                    onClick={() => setGroupBy(o.value)}
-                  >
+                  <button key={o.value} className={`filter-btn${groupBy === o.value ? ' filter-btn--active' : ''}`} onClick={() => setGroupBy(o.value)}>
                     {o.label}
                   </button>
                 ))}
@@ -163,141 +185,105 @@ export default function TrainingData() {
             </div>
           )}
           <div className="view-toggle">
-            <button
-              className={`view-btn${view === 'table' ? ' view-btn--active' : ''}`}
-              onClick={() => setView('table')}
-              title="Table view"
-            >
-              <TableIcon />
-            </button>
-            <button
-              className={`view-btn${view === 'chart' ? ' view-btn--active' : ''}`}
-              onClick={() => setView('chart')}
-              title="Chart view"
-            >
-              <ChartIcon />
-            </button>
+            <button className={`view-btn${view === 'table' ? ' view-btn--active' : ''}`} onClick={() => setView('table')} title="Table view"><TableIcon /></button>
+            <button className={`view-btn${view === 'chart' ? ' view-btn--active' : ''}`} onClick={() => setView('chart')} title="Chart view"><ChartIcon /></button>
           </div>
         </div>
       </div>
 
-      {/* ── Filter bar ── */}
+      {/* Filter bar */}
       <div className="td-filterbar">
-        <input
-          className="td-search"
-          type="search"
-          placeholder="Search name, course, company, venue…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <input className="td-search" type="search" placeholder="Search name, ID, course, company…" value={search} onChange={e => setSearch(e.target.value)} />
 
         <div className="td-filter-group">
           <label className="td-filter-label">Status</label>
           <div className="td-pills">
             {statuses.map(s => (
-              <button
-                key={s}
-                className={`filter-btn${status === s ? ' filter-btn--active' : ''}`}
-                onClick={() => setStatus(s)}
-              >
-                {s}
-              </button>
+              <button key={s} className={`filter-btn${status === s ? ' filter-btn--active' : ''}`} onClick={() => setStatus(s)}>{s}</button>
             ))}
           </div>
         </div>
 
         <div className="td-filter-group">
           <label className="td-filter-label">Venue</label>
-          <select
-            className="td-select"
-            value={venue}
-            onChange={e => setVenue(e.target.value)}
-          >
+          <select className="td-select" value={venue} onChange={e => setVenue(e.target.value)}>
             {venues.map(v => <option key={v}>{v}</option>)}
           </select>
         </div>
 
         <div className="td-filter-group">
           <label className="td-filter-label">Course</label>
-          <select
-            className="td-select"
-            value={course}
-            onChange={e => setCourse(e.target.value)}
-          >
+          <select className="td-select" value={course} onChange={e => setCourse(e.target.value)}>
             {courses.map(c => <option key={c}>{c}</option>)}
           </select>
         </div>
 
         <div className="td-filter-group">
-          <label className="td-filter-label">Training from</label>
-          <input
-            className="td-date"
-            type="date"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-          />
+          <label className="td-filter-label">From</label>
+          <input className="td-date" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         </div>
 
         <div className="td-filter-group">
           <label className="td-filter-label">To</label>
-          <input
-            className="td-date"
-            type="date"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-          />
+          <input className="td-date" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
         </div>
 
         {activeFilterCount > 0 && (
-          <button className="td-clear" onClick={clearFilters}>
-            Clear filters ({activeFilterCount})
-          </button>
+          <button className="td-clear" onClick={clearFilters}>Clear filters ({activeFilterCount})</button>
         )}
       </div>
 
-      {/* ── Content ── */}
       {view === 'table' ? (
         <>
           <div className="td-table-wrap">
-            <table className="td-table">
+            <table className="td-table td-table--pivot">
               <thead>
                 <tr>
-                  {COLUMNS.map(col => (
-                    <th
-                      key={col.key}
-                      className={`th-sortable${sortKey === col.key ? ' th-sorted' : ''}`}
-                      onClick={() => handleSort(col.key)}
-                    >
-                      <span className="th-inner">
-                        {col.label}
-                        <SortIcon dir={sortKey === col.key ? sortDir : null} />
-                      </span>
+                  {FIXED_COLS.map(col => (
+                    <th key={col.key} className={`th-sortable${sortKey === col.key ? ' th-sorted' : ''}`} onClick={() => handleSort(col.key)}>
+                      <span className="th-inner">{col.label}<SortIcon dir={sortKey === col.key ? sortDir : null} /></span>
                     </th>
+                  ))}
+                  {Array.from({ length: maxCourses }, (_, i) => (
+                    <>
+                      <th key={`c${i}`} className="th-course-group">Course {i + 1}</th>
+                      <th key={`e${i}`} className="th-course-group">Expiry {i + 1}</th>
+                    </>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {sorted.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="td-empty">No records match your filters.</td>
-                  </tr>
+                  <tr><td colSpan={totalCols} className="td-empty">No records match your filters.</td></tr>
                 ) : (
                   paginated.map(r => (
-                    <tr key={r.id}>
-                      <td className="td-name">{r.candidateName}</td>
-                      <td>{r.course}</td>
-                      <td>{r.company ?? '—'}</td>
-                      <td>{r.venue ?? '—'}</td>
-                      <td>{fmt(r.trainingDate)}</td>
-                      <td>{fmt(r.endDate)}</td>
-                      <td>
-                        <span className={`badge badge--${r.status.replace(' ', '-').toLowerCase()}`}>
-                          {r.status}
-                        </span>
-                      </td>
-                      <td className={r.expiryDate && isExpiringSoon(r.expiryDate) ? 'td-expiry-warn' : ''}>
-                        {fmt(r.expiryDate)}
-                      </td>
+                    <tr key={r.key}
+                      onMouseEnter={e => show(e, [
+                        { label: 'Company',   value: r.company },
+                        { label: 'Name',      value: `${r.firstName} ${r.lastName}`.trim() },
+                        { label: 'ID Number', value: r.idNumber },
+                        ...r.courses.slice(0, 3).map((c, i) => ([
+                          { label: `Course ${i + 1}`, value: c.course },
+                          { label: `Expiry ${i + 1}`, value: c.expiryDate ? fmt(c.expiryDate) : null },
+                        ])).flat().filter(l => l.value),
+                      ])}
+                      onMouseLeave={hide}
+                    >
+                      <td>{r.company}</td>
+                      <td>{r.firstName}</td>
+                      <td>{r.lastName}</td>
+                      <td className="td-id">{r.idNumber}</td>
+                      {Array.from({ length: maxCourses }, (_, i) => {
+                        const c = r.courses[i];
+                        return (
+                          <>
+                            <td key={`c${i}`}>{c ? c.course : '—'}</td>
+                            <td key={`e${i}`} className={c ? expiryClass(c.expiryDate) : ''}>
+                              {c ? fmt(c.expiryDate) : '—'}
+                            </td>
+                          </>
+                        );
+                      })}
                     </tr>
                   ))
                 )}
@@ -306,12 +292,12 @@ export default function TrainingData() {
           </div>
           <div className="td-pagination">
             <span className="td-count">
-              {filtered.length} record{filtered.length !== 1 ? 's' : ''}
+              {learnerRows.length} learner{learnerRows.length !== 1 ? 's' : ''} ({filtered.length} enrolments)
               {totalPages > 1 && ` — page ${page + 1} of ${totalPages}`}
             </span>
             {totalPages > 1 && (
               <div className="td-page-controls">
-                <button className="td-page-btn" onClick={() => setPage(0)}          disabled={page === 0}>««</button>
+                <button className="td-page-btn" onClick={() => setPage(0)} disabled={page === 0}>««</button>
                 <button className="td-page-btn" onClick={() => setPage(p => p - 1)} disabled={page === 0}>‹ Prev</button>
                 <button className="td-page-btn" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages - 1}>Next ›</button>
                 <button className="td-page-btn" onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1}>»»</button>
@@ -322,6 +308,7 @@ export default function TrainingData() {
       ) : (
         <TrainingChart records={filtered} groupBy={groupBy} />
       )}
+      <RowTooltip tooltip={tooltip} />
     </main>
   );
 }

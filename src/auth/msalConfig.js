@@ -15,3 +15,5 @@ export const msalConfig = {
 export const dataverseScopes = [
   'https://gravitytraining.crm4.dynamics.com/user_impersonation',
 ];
+
+export const mailScopes = ['https://graph.microsoft.com/Mail.Send'];

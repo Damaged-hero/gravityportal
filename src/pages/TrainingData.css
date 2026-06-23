@@ -172,15 +172,14 @@
   text-overflow: ellipsis;
 }
 
-/* column widths — table is min-width:1440px so these are absolute */
-.td-table th:nth-child(1) { width: 200px; } /* Candidate */
-.td-table th:nth-child(2) { width: 260px; } /* Course */
-.td-table th:nth-child(3) { width: 165px; } /* Company */
-.td-table th:nth-child(4) { width: 165px; } /* Venue */
-.td-table th:nth-child(5) { width: 110px; } /* Start Date */
-.td-table th:nth-child(6) { width: 110px; } /* End Date */
-.td-table th:nth-child(7) { width: 105px; } /* Status */
-.td-table th:nth-child(8) { width: 110px; } /* Revalidation */
+/* pivot table — fixed columns + dynamic course pairs */
+.td-table--pivot { min-width: unset; table-layout: auto; }
+.td-table--pivot th:nth-child(1) { min-width: 160px; } /* Company */
+.td-table--pivot th:nth-child(2) { min-width: 120px; } /* First Name */
+.td-table--pivot th:nth-child(3) { min-width: 130px; } /* Last Name */
+.td-table--pivot th:nth-child(4) { min-width: 120px; } /* ID Number */
+.th-course-group                  { min-width: 180px; }
+.td-id                            { font-family: monospace; font-size: 0.82rem; }
 
 /* sortable header */
 .th-sortable {
@@ -222,7 +221,9 @@
 
 .td-name          { font-weight: 500; }
 .td-mono          { font-family: 'Courier New', monospace; font-size: 0.78rem; color: var(--text-muted); }
-.td-expiry-warn   { color: #b45309; font-weight: 600; }
+.td-expiry-red    { color: #d2232a; font-weight: 700; background: rgba(210,35,42,0.08); }
+.td-expiry-orange { color: #b45309; font-weight: 600; background: rgba(180,83,9,0.08); }
+.td-expiry-green  { color: #16a34a; font-weight: 600; background: rgba(22,163,74,0.08); }
 .td-empty         { text-align: center; color: var(--text-muted); padding: 2.5rem !important; white-space: normal !important; }
 .td-pagination    { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
 .td-count         { font-size: 0.78rem; color: var(--text-muted); }

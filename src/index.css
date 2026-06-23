@@ -11,3 +11,12 @@ html, body {
 }
 
 button { font-family: inherit; background: none; border: none; padding: 0; }
+
+/* ── Styled scrollbars (Webkit + Firefox) ── */
+::-webkit-scrollbar              { width: 6px; height: 6px; }
+::-webkit-scrollbar-track        { background: transparent; }
+::-webkit-scrollbar-thumb        { background: rgba(120,120,140,0.35); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover  { background: rgba(120,120,140,0.60); }
+::-webkit-scrollbar-corner       { background: transparent; }
+
+* { scrollbar-width: thin; scrollbar-color: rgba(120,120,140,0.35) transparent; }
