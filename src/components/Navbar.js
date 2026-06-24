@@ -1,24 +1,35 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-import { useMsal, useIsAuthenticated } from '@azure/msal-react';
-import { dataverseScopes } from '../auth/msalConfig';
-import { useProfilePhoto } from '../auth/useProfilePhoto';
+import { useAuth0 } from '@auth0/auth0-react';
+import { ADMIN_EMAILS } from '../auth/auth0Config';
 import logo from '../assets/New-Generic.png';
 import './Navbar.css';
 
 export default function Navbar() {
   const { isDark, toggle } = useTheme();
-  const { instance, accounts } = useMsal();
-  const isAuthenticated = useIsAuthenticated();
-  const userName = accounts[0]?.name ?? accounts[0]?.username ?? '';
-  const photoUrl = useProfilePhoto();
+  const { isAuthenticated, loginWithRedirect, logout, user } = useAuth0();
+  const userName = user?.name ?? user?.email ?? '';
+  const isAdmin  = ADMIN_EMAILS.includes((user?.email ?? '').toLowerCase());
+  const photoUrl = user?.picture ?? null;
 
   function signIn() {
-    instance.loginRedirect({ scopes: dataverseScopes });
+    loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: window.location.origin,
+        connection: 'gravity-entra',
+      },
+    }).catch(e => console.error('[Auth0] login error:', e));
+  }
+  function signInClient() {
+    loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: window.location.origin,
+      },
+    }).catch(e => console.error('[Auth0] login error:', e));
   }
   function signOut() {
-    instance.logoutRedirect({ account: accounts[0] });
+    logout({ logoutParams: { returnTo: window.location.origin } });
   }
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [menuOpen, setMenuOpen]         = useState(false);
@@ -68,11 +79,16 @@ export default function Navbar() {
         <ul className="navbar-links">
           <li><NavLink to="/" end className={({ isActive }) => isActive ? 'active' : ''}>Home</NavLink></li>
           <li><NavLink to="/training-data" className={({ isActive }) => isActive ? 'active' : ''}>Training Data</NavLink></li>
+          {isAdmin && <li><NavLink to="/admin" className={({ isActive }) => isActive ? 'active' : ''}>Admin</NavLink></li>}
         </ul>
 
         <div className="navbar-right">
           {!isAuthenticated && (
-            <button className="auth-btn auth-btn--in" onClick={signIn}>Sign in with Microsoft</button>
+            <>
+              <button className="auth-btn auth-btn--in" onClick={signInClient}>Client Login</button>
+              <button className="auth-btn auth-btn--in" onClick={signIn}>Gravity Staff</button>
+            </>
+
           )}
           {/* user avatar + dropdown */}
           <div className="navbar-user" ref={dropdownRef}>
@@ -102,7 +118,7 @@ export default function Navbar() {
                 <div className="dropdown-section">
                   {isAuthenticated
                     ? <button className="auth-btn auth-btn--out" onClick={signOut}>Sign out</button>
-                    : <button className="auth-btn auth-btn--in"  onClick={signIn}>Sign in with Microsoft</button>
+                    : <button className="auth-btn auth-btn--in"  onClick={signIn}>Sign in</button>
                   }
                 </div>
               </div>
@@ -125,6 +141,7 @@ export default function Navbar() {
         <div className="mobile-drawer">
           <NavLink to="/" end onClick={closeMenu} className={({ isActive }) => isActive ? 'active' : ''}>Home</NavLink>
           <NavLink to="/training-data" onClick={closeMenu} className={({ isActive }) => isActive ? 'active' : ''}>Training Data</NavLink>
+          {isAdmin && <NavLink to="/admin" onClick={closeMenu} className={({ isActive }) => isActive ? 'active' : ''}>Admin</NavLink>}
           <div className="drawer-divider" />
           <div className="drawer-theme-row">
             <span className="dropdown-label">Theme</span>

@@ -197,6 +197,9 @@
 
 .recent-table tbody tr:last-child td { border-bottom: none; }
 .recent-table tbody tr:hover          { background: var(--hover-bg); }
+.recent-table .td-group-cell          { vertical-align: top; border-right: 1px solid var(--border); }
+.recent-table .tr-learner-first td    { border-top: 2px solid var(--border); }
+.recent-table .tr-learner-cont td     { border-top: 1px dashed rgba(120,120,140,0.2); }
 .td-expiry-red    { color: #d2232a; font-weight: 700; background: rgba(210,35,42,0.08); }
 .td-expiry-orange { color: #b45309; font-weight: 600; background: rgba(180,83,9,0.08); }
 
@@ -265,6 +268,19 @@
   border-radius: 999px;
   transition: width 0.4s ease;
 }
+
+.region-bar-row--clickable {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0 4px;
+  margin: 0 -4px;
+  transition: background 0.15s;
+}
+.region-bar-row--clickable:hover  { background: var(--hover-bg); }
+.region-bar-row--active            { background: var(--accent-subtle); }
+.region-bar-row--active .region-bar-label,
+.region-bar-row--active .region-bar-count { color: var(--accent); font-weight: 700; }
+.region-bar-row--dimmed            { opacity: 0.35; }
 
 .region-bar-count {
   font-size: 0.73rem;

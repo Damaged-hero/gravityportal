@@ -1,0 +1,15 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "DATAVERSE_URL": "https://gravitytraining.api.crm4.dynamics.com/api/data/v9.2",
+    "DATAVERSE_TENANT_ID": "385f3470-aae2-44d0-8cff-1da9ffd31951",
+    "DATAVERSE_CLIENT_ID": "c119b622-30f3-4629-bff8-624d6433690e",
+    "DATAVERSE_CLIENT_SECRET": "fol8Q~oriu6ZQ~57~onBw6lX~-uuNXfhTPWfDb~U",
+    "AUTH0_DOMAIN": "dev-uzjcc3fqzuflvumc.us.auth0.com",
+    "AUTH0_AUDIENCE": "https://gravityportal-api",
+    "ADMIN_EMAILS": "ruanvz@gravitygh.co.za,ewan@gravitygh.co.za",
+    "ALLOWED_ORIGINS": "http://localhost:3000,https://damaged-hero.github.io"
+  }
+}

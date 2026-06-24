@@ -90,7 +90,7 @@ ${userName || 'Portal User'}`;
           message: {
             subject: `Rebook Request – ${candidate} – ${course}`,
             body:    { contentType: 'Text', content: body },
-            toRecipients: [{ emailAddress: { address: 'ewan@gravitygh.co.za' } }],
+            toRecipients: [{ emailAddress: { address: 'development@gravitygh.co.za' } }],
             replyTo:      [{ emailAddress: { address: email } }],
           },
           saveToSentItems: true,

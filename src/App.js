@@ -5,6 +5,7 @@ import Footer from './components/Footer';
 import Home from './pages/Home';
 import TrainingData from './pages/TrainingData';
 import User from './pages/User';
+import Admin from './pages/Admin';
 import './App.css';
 
 function AppShell() {
@@ -17,6 +18,7 @@ function AppShell() {
           <Route path="/" element={<Home />} />
           <Route path="/training-data" element={<TrainingData />} />
           <Route path="/user" element={<User />} />
+          <Route path="/admin" element={<Admin />} />
         </Routes>
       </div>
       <Footer />

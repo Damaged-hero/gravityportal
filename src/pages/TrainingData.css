@@ -172,14 +172,24 @@
   text-overflow: ellipsis;
 }
 
-/* pivot table — fixed columns + dynamic course pairs */
-.td-table--pivot { min-width: unset; table-layout: auto; }
-.td-table--pivot th:nth-child(1) { min-width: 160px; } /* Company */
-.td-table--pivot th:nth-child(2) { min-width: 120px; } /* First Name */
-.td-table--pivot th:nth-child(3) { min-width: 130px; } /* Last Name */
-.td-table--pivot th:nth-child(4) { min-width: 120px; } /* ID Number */
-.th-course-group                  { min-width: 180px; }
-.td-id                            { font-family: monospace; font-size: 0.82rem; }
+/* grouped layout — one row per course, candidate cells rowspan */
+.td-table--grouped { min-width: unset; table-layout: auto; }
+.td-table--grouped th:nth-child(1) { min-width: 160px; }
+.td-table--grouped th:nth-child(2) { min-width: 110px; }
+.td-table--grouped th:nth-child(3) { min-width: 120px; }
+.td-table--grouped th:nth-child(4) { min-width: 120px; }
+.td-table--grouped th:nth-child(5) { min-width: 220px; }
+.td-table--grouped th:nth-child(6) { min-width: 90px;  }
+.td-table--grouped th:nth-child(7) { min-width: 110px; }
+.td-id { font-family: monospace; font-size: 0.82rem; }
+
+.td-group-cell {
+  vertical-align: top;
+  border-right: 1px solid var(--border);
+}
+
+.tr-learner-first td { border-top: 2px solid var(--border); }
+.tr-learner-cont  td { border-top: 1px dashed rgba(120,120,140,0.2); }
 
 /* sortable header */
 .th-sortable {

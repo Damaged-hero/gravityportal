@@ -17,3 +17,5 @@ export const dataverseScopes = [
 ];
 
 export const mailScopes = ['https://graph.microsoft.com/Mail.Send'];
+
+export const ADMIN_EMAILS = ['ruanvz@gravitygh.co.za', 'ewan@gravitygh.co.za'];

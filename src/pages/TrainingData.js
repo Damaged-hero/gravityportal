@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { useTrainingRecords } from '../auth/useTrainingRecords';
-import { useUserProfile } from '../auth/useUserProfile';
+import { useAuth0 } from '@auth0/auth0-react';
+import { useApiTrainingRecords as useTrainingRecords } from '../auth/useApiTrainingRecords';
 import TrainingChart, { GROUP_OPTIONS } from '../components/TrainingChart';
 import { useRowTooltip, RowTooltip } from '../components/RowTooltip';
+import LoadingScreen from '../components/LoadingScreen';
 import './TrainingData.css';
 
 function fmt(dateStr) {
@@ -63,7 +64,9 @@ export default function TrainingData() {
   const [page, setPage]         = useState(0);
 
   const { records, loading, error } = useTrainingRecords();
-  const { companyName, isGravity }  = useUserProfile();
+  const { user } = useAuth0();
+  const isGravity  = (user?.email ?? '').toLowerCase().endsWith('@gravitygh.co.za');
+  const companyName = user?.name ?? null;
   const { tooltip, show, hide }     = useRowTooltip();
 
   function handleSort(key) {
@@ -142,10 +145,6 @@ export default function TrainingData() {
     return Array.from(map.values());
   }, [filtered]);
 
-  const maxCourses = useMemo(() =>
-    Math.min(3, learnerRows.reduce((m, r) => Math.max(m, r.courses.length), 0)),
-  [learnerRows]);
-
   const sorted = useMemo(() => {
     return [...learnerRows].sort((a, b) => {
       const av = a[sortKey] ?? '';
@@ -159,9 +158,9 @@ export default function TrainingData() {
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const paginated  = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-  const totalCols  = FIXED_COLS.length + maxCourses * 2;
+  const totalCols  = FIXED_COLS.length + 3;
 
-  if (loading) return <main className="page page--full"><p style={{color:'var(--text-muted)', padding:'2rem 0'}}>Loading live data…</p></main>;
+  if (loading) return <LoadingScreen message="Fetching training records…" />;
   if (error)   return <main className="page page--full"><p style={{color:'#d2232a', padding:'2rem 0'}}>Dataverse error: {error}</p></main>;
 
   return (
@@ -236,7 +235,7 @@ export default function TrainingData() {
       {view === 'table' ? (
         <>
           <div className="td-table-wrap">
-            <table className="td-table td-table--pivot">
+            <table className="td-table td-table--grouped">
               <thead>
                 <tr>
                   {FIXED_COLS.map(col => (
@@ -244,48 +243,45 @@ export default function TrainingData() {
                       <span className="th-inner">{col.label}<SortIcon dir={sortKey === col.key ? sortDir : null} /></span>
                     </th>
                   ))}
-                  {Array.from({ length: maxCourses }, (_, i) => (
-                    <>
-                      <th key={`c${i}`} className="th-course-group">Course {i + 1}</th>
-                      <th key={`e${i}`} className="th-course-group">Expiry {i + 1}</th>
-                    </>
-                  ))}
+                  <th>Course</th>
+                  <th>Status</th>
+                  <th>Expiry Date</th>
                 </tr>
               </thead>
               <tbody>
                 {sorted.length === 0 ? (
-                  <tr><td colSpan={totalCols} className="td-empty">No records match your filters.</td></tr>
+                  <tr><td colSpan={7} className="td-empty">No records match your filters.</td></tr>
                 ) : (
-                  paginated.map(r => (
-                    <tr key={r.key}
-                      onMouseEnter={e => show(e, [
-                        { label: 'Company',   value: r.company },
-                        { label: 'Name',      value: `${r.firstName} ${r.lastName}`.trim() },
-                        { label: 'ID Number', value: r.idNumber },
-                        ...r.courses.slice(0, 3).map((c, i) => ([
-                          { label: `Course ${i + 1}`, value: c.course },
-                          { label: `Expiry ${i + 1}`, value: c.expiryDate ? fmt(c.expiryDate) : null },
-                        ])).flat().filter(l => l.value),
-                      ])}
-                      onMouseLeave={hide}
-                    >
-                      <td>{r.company}</td>
-                      <td>{r.firstName}</td>
-                      <td>{r.lastName}</td>
-                      <td className="td-id">{r.idNumber}</td>
-                      {Array.from({ length: maxCourses }, (_, i) => {
-                        const c = r.courses[i];
-                        return (
-                          <>
-                            <td key={`c${i}`}>{c ? c.course : '—'}</td>
-                            <td key={`e${i}`} className={c ? expiryClass(c.expiryDate) : ''}>
-                              {c ? fmt(c.expiryDate) : '—'}
-                            </td>
-                          </>
-                        );
-                      })}
-                    </tr>
-                  ))
+                  paginated.map(r => {
+                    const courses = r.courses.length > 0 ? r.courses : [null];
+                    return courses.map((c, i) => (
+                      <tr key={`${r.key}-${i}`}
+                        className={i === 0 ? 'tr-learner-first' : 'tr-learner-cont'}
+                        onMouseEnter={e => show(e, [
+                          { label: 'Company',   value: r.company },
+                          { label: 'Name',      value: `${r.firstName} ${r.lastName}`.trim() },
+                          { label: 'ID Number', value: r.idNumber },
+                          ...r.courses.map((c, j) => ([
+                            { label: `Course ${j + 1}`, value: c.course },
+                            { label: `Expiry ${j + 1}`, value: c.expiryDate ? fmt(c.expiryDate) : null },
+                          ])).flat().filter(l => l.value),
+                        ])}
+                        onMouseLeave={hide}
+                      >
+                        {i === 0 && <>
+                          <td rowSpan={courses.length} className="td-group-cell">{r.company}</td>
+                          <td rowSpan={courses.length} className="td-group-cell">{r.firstName}</td>
+                          <td rowSpan={courses.length} className="td-group-cell">{r.lastName}</td>
+                          <td rowSpan={courses.length} className="td-group-cell td-id">{r.idNumber}</td>
+                        </>}
+                        <td>{c ? c.course : '—'}</td>
+                        <td>{c ? (
+                          <span className={`badge badge--${(c.status || '').replace(' ','-').toLowerCase()}`}>{c.status || '—'}</span>
+                        ) : '—'}</td>
+                        <td className={c ? expiryClass(c.expiryDate) : ''}>{c ? fmt(c.expiryDate) : '—'}</td>
+                      </tr>
+                    ));
+                  })
                 )}
               </tbody>
             </table>

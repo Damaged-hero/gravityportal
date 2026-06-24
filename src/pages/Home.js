@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { useMsal } from '@azure/msal-react';
-import { useTrainingRecords } from '../auth/useTrainingRecords';
+import { useAuth0 } from '@auth0/auth0-react';
+import { useApiTrainingRecords } from '../auth/useApiTrainingRecords';
 import { useRowTooltip, RowTooltip } from '../components/RowTooltip';
 import RebookModal from '../components/RebookModal';
+import LoadingScreen from '../components/LoadingScreen';
 import './Home.css';
 
 const STATUS_COLOURS = {
@@ -27,7 +28,7 @@ function StatCard({ label, value, sub, accent, active, onClick }) {
 }
 
 function DonutChart({ data, total }) {
-  const cx = 110, cy = 110, r = 80, stroke = 28;
+  const cx = 80, cy = 80, r = 58, stroke = 20;
   const circumference = 2 * Math.PI * r;
   let offset = 0;
   const slices = data.map(d => {
@@ -38,7 +39,7 @@ function DonutChart({ data, total }) {
     return slice;
   });
   return (
-    <svg viewBox="0 0 220 220" width="220" height="220" style={{ display: 'block', margin: '0 auto' }}>
+    <svg viewBox="0 0 160 160" width="160" height="160" style={{ display: 'block', margin: '0 auto' }}>
       {slices.map(s => (
         <circle key={s.name} cx={cx} cy={cy} r={r} fill="none"
           stroke={STATUS_COLOURS[s.name] || '#94a3b8'} strokeWidth={stroke}
@@ -47,8 +48,8 @@ function DonutChart({ data, total }) {
           style={{ transition: 'stroke-dasharray 0.4s ease' }}
         />
       ))}
-      <text x={cx} y={cy - 8} textAnchor="middle" fontSize="28" fontWeight="700" fill="currentColor">{total}</text>
-      <text x={cx} y={cy + 16} textAnchor="middle" fontSize="12" fill="#6b7280">enrolments</text>
+      <text x={cx} y={cy - 6} textAnchor="middle" fontSize="22" fontWeight="700" fill="currentColor">{total}</text>
+      <text x={cx} y={cy + 12} textAnchor="middle" fontSize="10" fill="#6b7280">enrolments</text>
     </svg>
   );
 }
@@ -99,7 +100,7 @@ function StatusPieChart({ records }) {
   );
 }
 
-function VenueBarChart({ records }) {
+function VenueBarChart({ records, selectedVenue, onVenueClick }) {
   const { data, total } = useMemo(() => {
     const counts = {};
     records.forEach(r => {
@@ -114,21 +115,33 @@ function VenueBarChart({ records }) {
   const max = data.length ? data[0].count : 1;
   return (
     <div className="pie-card">
-      <div className="pie-card-header"><h2>Enrolments by Venue</h2></div>
+      <div className="pie-card-header">
+        <h2>Enrolments by Venue</h2>
+        {selectedVenue && (
+          <button className="pie-clear" onClick={() => onVenueClick(null)} title="Clear venue filter">✕</button>
+        )}
+      </div>
       {data.length === 0 ? (
         <p className="pie-empty">No venue data available.</p>
       ) : (
         <div className="region-bars">
-          {data.map(({ venue, count }) => (
-            <div key={venue} className="region-bar-row">
-              <span className="region-bar-label">{venue}</span>
-              <div className="region-bar-track"><div className="region-bar-fill" style={{ width: `${(count / max) * 100}%` }} /></div>
-              <span className="region-bar-count">{count}</span>
-            </div>
-          ))}
+          {data.map(({ venue, count }) => {
+            const active = selectedVenue === venue;
+            const dimmed = selectedVenue && !active;
+            return (
+              <div key={venue} className={`region-bar-row region-bar-row--clickable${active ? ' region-bar-row--active' : ''}${dimmed ? ' region-bar-row--dimmed' : ''}`}
+                onClick={() => onVenueClick(active ? null : venue)}
+                title={`Filter by ${venue}`}
+              >
+                <span className="region-bar-label">{venue}</span>
+                <div className="region-bar-track"><div className="region-bar-fill" style={{ width: `${(count / max) * 100}%` }} /></div>
+                <span className="region-bar-count">{count}</span>
+              </div>
+            );
+          })}
         </div>
       )}
-      <p className="pie-total">{total} enrolments with venue data</p>
+      <p className="pie-total">{selectedVenue ? `Filtered: ${selectedVenue}` : `${total} enrolments with venue data`}</p>
     </div>
   );
 }
@@ -147,10 +160,11 @@ const COL_HEADERS = {
 };
 
 export default function Home() {
-  const { accounts } = useMsal();
-  const userName = accounts[0]?.name ?? accounts[0]?.username ?? '';
-  const { records } = useTrainingRecords();
+  const { user } = useAuth0();
+  const userName = user?.name ?? user?.email ?? '';
+  const { records, loading } = useApiTrainingRecords();
   const [activeFilter, setActiveFilter] = useState('all');
+  const [venueFilter, setVenueFilter]   = useState(null);
   const { tooltip, show, hide } = useRowTooltip();
   const [rebookRecord, setRebookRecord] = useState(null);
 
@@ -190,6 +204,36 @@ export default function Home() {
 
   const cols = FILTERS[activeFilter]?.cols ?? FILTERS.all.cols;
 
+  const filteredTableRecords = useMemo(() => {
+    if (!venueFilter) return tableRecords;
+    // Apply venue on top of the status-filtered base (re-derive without slice limit)
+    let base = [...records];
+    switch (activeFilter) {
+      case 'completed':   base = base.filter(r => r.status === 'Completed'); break;
+      case 'failed':      base = base.filter(r => r.status === 'Failed'); break;
+      case 'pending':     base = base.filter(r => r.status === 'Pending'); break;
+      case 'revalidation': base = base.filter(r => {
+        if (!r.expiryDate) return false;
+        return (new Date(r.expiryDate) - new Date()) / (1000 * 60 * 60 * 24) <= 180;
+      }); break;
+      default: base = base.filter(r => r.trainingDate); break;
+    }
+    return base
+      .filter(r => r.venue === venueFilter)
+      .sort((a, b) => new Date(b.trainingDate) - new Date(a.trainingDate))
+      .slice(0, 50);
+  }, [tableRecords, venueFilter, records, activeFilter]);
+
+  const groupedRecords = useMemo(() => {
+    const map = new Map();
+    filteredTableRecords.forEach(r => {
+      const key = r.idNumber || r.candidateName;
+      if (!map.has(key)) map.set(key, { key, name: r.candidateName, rows: [] });
+      map.get(key).rows.push(r);
+    });
+    return Array.from(map.values());
+  }, [filteredTableRecords]);
+
   function toggle(key) {
     setActiveFilter(prev => prev === key ? 'all' : key);
   }
@@ -201,6 +245,8 @@ export default function Home() {
     if (diff <= 180) return 'td-expiry-orange';
     return '';
   }
+
+  if (loading) return <LoadingScreen message="Fetching your training data…" />;
 
   return (
     <main className="page">
@@ -214,7 +260,7 @@ export default function Home() {
       <div className="home-body">
         <div className="home-left">
           <StatusPieChart records={records} />
-          <VenueBarChart records={records} />
+          <VenueBarChart records={records} selectedVenue={venueFilter} onVenueClick={setVenueFilter} />
         </div>
 
         <div className="home-right">
@@ -233,38 +279,46 @@ export default function Home() {
           </div>
 
           <section className="home-section">
-            <h2>{FILTERS[activeFilter]?.label ?? 'Recent Training'}</h2>
+            <h2>{FILTERS[activeFilter]?.label ?? 'Recent Training'}{venueFilter ? ` — ${venueFilter}` : ''}</h2>
             <div className="recent-table-wrap">
               <table className="recent-table">
                 <thead>
                   <tr>{cols.map(c => <th key={c}>{COL_HEADERS[c]}</th>)}</tr>
                 </thead>
                 <tbody>
-                  {tableRecords.map(r => (
-                    <tr key={r.id}
-                      onClick={() => activeFilter === 'revalidation' && setRebookRecord(r)}
-                      style={activeFilter === 'revalidation' ? { cursor: 'pointer' } : undefined}
-                      onMouseEnter={e => show(e, [
+                  {groupedRecords.map(group => (
+                    group.rows.map((r, i) => {
+                      const tooltipLines = [
                         { label: 'Candidate', value: r.candidateName },
-                        { label: 'Course',    value: r.course },
-                        { label: 'Venue',     value: r.venue },
-                        { label: 'Date',      value: fmtDate(r.trainingDate) },
-                        { label: 'Status',    value: r.status },
-                        { label: 'Expiry',    value: r.expiryDate ? fmtDate(r.expiryDate) : null },
-                      ].filter(l => l.value))}
-                      onMouseLeave={hide}
-                    >
-                      {cols.includes('candidate') && <td>{r.candidateName}</td>}
-                      {cols.includes('course')    && <td>{r.course}</td>}
-                      {cols.includes('venue')     && <td>{r.venue ?? '—'}</td>}
-                      {cols.includes('date')      && <td>{fmtDate(r.trainingDate)}</td>}
-                      {cols.includes('status')    && (
-                        <td><span className={`badge badge--${r.status.replace(' ','-').toLowerCase()}`}>{r.status}</span></td>
-                      )}
-                      {cols.includes('expiry')    && (
-                        <td className={expiryClass(r.expiryDate)}>{fmtDate(r.expiryDate)}</td>
-                      )}
-                    </tr>
+                        ...group.rows.map((gr, j) => ([
+                          { label: `Course ${j + 1}`, value: gr.course },
+                          { label: `Date ${j + 1}`,   value: fmtDate(gr.trainingDate) },
+                          { label: `Expiry ${j + 1}`, value: gr.expiryDate ? fmtDate(gr.expiryDate) : null },
+                        ])).flat().filter(l => l.value),
+                      ];
+                      return (
+                        <tr key={r.id}
+                          className={i === 0 ? 'tr-learner-first' : 'tr-learner-cont'}
+                          onClick={() => activeFilter === 'revalidation' && setRebookRecord(r)}
+                          style={activeFilter === 'revalidation' ? { cursor: 'pointer' } : undefined}
+                          onMouseEnter={e => show(e, tooltipLines)}
+                          onMouseLeave={hide}
+                        >
+                          {cols.includes('candidate') && i === 0 && (
+                            <td rowSpan={group.rows.length} className="td-group-cell">{r.candidateName}</td>
+                          )}
+                          {cols.includes('course')  && <td>{r.course}</td>}
+                          {cols.includes('venue')   && <td>{r.venue ?? '—'}</td>}
+                          {cols.includes('date')    && <td>{fmtDate(r.trainingDate)}</td>}
+                          {cols.includes('status')  && (
+                            <td><span className={`badge badge--${r.status.replace(' ','-').toLowerCase()}`}>{r.status}</span></td>
+                          )}
+                          {cols.includes('expiry')  && (
+                            <td className={expiryClass(r.expiryDate)}>{fmtDate(r.expiryDate)}</td>
+                          )}
+                        </tr>
+                      );
+                    })
                   ))}
                 </tbody>
               </table>
@@ -278,8 +332,8 @@ export default function Home() {
       <RowTooltip tooltip={tooltip} />
       <RebookModal
         record={rebookRecord}
-        userName={accounts[0]?.name ?? accounts[0]?.username ?? ''}
-        userEmail={accounts[0]?.username ?? ''}
+        userName={user?.name ?? user?.email ?? ''}
+        userEmail={user?.email ?? ''}
         onClose={() => setRebookRecord(null)}
       />
     </main>
